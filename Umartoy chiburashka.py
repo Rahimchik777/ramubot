@@ -7,7 +7,7 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
 # --- ВАЖНЫЕ НАСТРОЙКИ ---
-BOT_TOKEN = "9244886158:AAE9IMYFokxS2DIPHMyAPScudoNZi6494FA" # Вставь сюда свой НОВЫЙ токен, если ты его сбрасывал!
+BOT_TOKEN = "9244886158:AAEof79CZ7_LKOTX-ExtqGDrgXc365HHifs" # Вставь сюда свой НОВЫЙ токен, если ты его сбрасывал!
 
 # ВНИМАНИЕ: Сюда нужно вставить НАСТОЯЩИЙ ID вашей группы! Без него пересылка работать НЕ БУДЕТ.
 ADMIN_GROUP_ID = -1004328946925
