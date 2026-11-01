@@ -7,7 +7,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
 # --- НАСТРОЙКИ ---
-BOT_TOKEN = "9244886158:AAE9IMYFokxS2DIPHMyAPScudoNZi6494FA"
+BOT_TOKEN = "9244886158:AAEof79CZ7_LKOTX-ExtqGDrgXc365HHifs"
 ADMIN_GROUP_ID = -1001234567895  # Потом поменяешь на ID своей группы
 
 # --- ВЕБ-СЕРВЕР ДЛЯ БЕССМЕРТИЯ НА RENDER ---
