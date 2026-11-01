@@ -17,7 +17,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "RAMU Store Bot 24/7 ishlamoqda!"s
+    return "RAMU Store Bot 24/7 ishlamoqda!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
