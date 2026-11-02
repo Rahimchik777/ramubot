@@ -15,23 +15,29 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 
 # ---------------------------------------------------------------
 # НАСТРОЙКИ
-# BOT_TOKEN обязательно задайте в Render -> Environment (не в коде!)
+# Вставьте токен ниже между кавычками (единственное место в файле).
 # ---------------------------------------------------------------
-BOT_TOKEN = "9244886158:AAHpFQPprvuPtUYGcPOyiXlwX8jkOjyWcT4"  # <-- единственная строка, которую нужно изменить
+BOT_TOKEN = "9244886158:AAHpFQPprvuPtUYGcPOyiXlwX8jkOjyWcT4"
 
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004328946925"))
 SITE_URL = os.environ.get("SITE_URL", "https://ramubot.onrender.com")
 
+BTN_CONTACT = "💬 Admin bilan bog'lanish"
 BTN_SITE = "🌐 RAMU Store saytiga o'tish"
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO
 )
+# Эти библиотеки печатают токен в адресах запросов — глушим их
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("werkzeug").setLevel(logging.WARNING)
 log = logging.getLogger("ramu-bot")
 
 # ---------------------------------------------------------------
@@ -52,7 +58,7 @@ def health():
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
-    flask_app.run(host="0.0.0.0", port=port)
+    flask_app.run(host="0.0.0.0", port=port, use_reloader=False)
 
 
 def self_ping():
@@ -75,8 +81,24 @@ def keep_alive():
 # ---------------------------------------------------------------
 # ЛОГИКА БОТА
 # ---------------------------------------------------------------
-def esc(text: str) -> str:
+def esc(text) -> str:
     return html.escape(text or "")
+
+
+async def log_update(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """Пишет в лог каждое входящее обновление (для диагностики)."""
+    if isinstance(update, Update):
+        msg = update.effective_message
+        chat = update.effective_chat
+        user = update.effective_user
+        text = (msg.text or msg.caption or "<не текст>") if msg else "<нет сообщения>"
+        log.info(
+            "ВХОДЯЩЕЕ: chat=%s (%s) user=%s text=%r",
+            chat.id if chat else None,
+            chat.type if chat else None,
+            user.id if user else None,
+            text[:60],
+        )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,7 +107,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [[KeyboardButton(BTN_CONTACT)], [KeyboardButton(BTN_SITE)]],
         resize_keyboard=True,
     )
-    await update.message.reply_html(
+    await update.effective_message.reply_html(
         f"Assalomu alaykum, <b>{name}</b>! 🚀\n\n"
         f"Bu <b>RAMU Store</b> do'konining rasmiy qo'llab-quvvatlash xizmati.\n\n"
         f"Istalgan savolingizni yoki buyurtma ma'lumotlarini shu yerda yozib qoldiring. "
@@ -96,7 +118,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def client_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сообщение клиента (только личка) -> карточка в админ-группу."""
-    msg = update.message
+    msg = update.effective_message
     user = update.effective_user
     text = msg.text
 
@@ -111,7 +133,10 @@ async def client_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     username = f"@{user.username}" if user.username else "yo'q"
-    body = esc(text[:3500]) if text else "<i>(matn emas — pastdagi xabarga qarang)</i>"
+    if text:
+        body = esc(text[:3500])
+    else:
+        body = "<i>(matn emas — pastdagi xabarga qarang)</i>"
 
     card = (
         "🔔 <b>YANGI MUROJAAT / BUYURTMA</b> 🔔\n\n"
@@ -127,7 +152,7 @@ async def client_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_map = context.bot_data.setdefault("reply_map", {})
         reply_map[sent.message_id] = user.id
 
-        # Фото, файлы, голосовые и т.д. копируем под карточкой
+        # Фото, файлы, голосовые, стикеры и т.д. копируем под карточкой
         if not text:
             copied = await context.bot.copy_message(
                 chat_id=ADMIN_GROUP_ID,
@@ -141,7 +166,7 @@ async def client_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "✅ Xabaringiz adminga muvaffaqiyatli yuborildi! Tez orada javob beramiz. 🚀"
         )
     except TelegramError as e:
-        log.error("Админ-группаға yuborishda xatolik: %s", e)
+        log.error("Не удалось отправить в админ-группу: %s", e)
         await msg.reply_text(
             "⚠️ Xatolik yuz berdi. Iltimos, birozdan so'ng qayta urinib ko'ring."
         )
@@ -149,7 +174,7 @@ async def client_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ответ админа (reply на карточку в группе) -> клиенту."""
-    msg = update.message
+    msg = update.effective_message
     replied = msg.reply_to_message
 
     # Реагируем только на ответ на сообщение самого бота
@@ -159,7 +184,7 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_map = context.bot_data.get("reply_map", {})
     client_id = reply_map.get(replied.message_id)
 
-    # Запасной вариант (после перезапуска бота): достаём ID из текста карточки
+    # Запасной вариант (после перезапуска бота): ID из текста карточки
     if client_id is None:
         source = replied.text or replied.caption or ""
         match = re.search(r"ID:\s*(\d+)", source)
@@ -168,7 +193,8 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if client_id is None:
         await msg.reply_text(
-            "⚠️ Mijoz ID topilmadi. Iltimos, mijozning kartochkasiga (YANGI MUROJAAT) javob bering."
+            "⚠️ Mijoz ID topilmadi. Iltimos, mijozning kartochkasiga "
+            "(YANGI MUROJAAT) javob bering."
         )
         return
 
@@ -189,7 +215,7 @@ async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Forbidden:
         await msg.reply_text("⚠️ Mijoz botni bloklagan, xabar yetib bormadi.")
     except TelegramError as e:
-        log.error("Mijozga yuborishda xatolik: %s", e)
+        log.error("Не удалось отправить клиенту: %s", e)
         await msg.reply_text(f"⚠️ Yuborib bo'lmadi: {e}")
 
 
@@ -197,17 +223,39 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     log.error("Необработанная ошибка:", exc_info=context.error)
 
 
+async def post_init(app):
+    """Проверка при запуске: бот жив и видит админ-группу."""
+    me = await app.bot.get_me()
+    log.info("Бот запущен: @%s", me.username)
+    try:
+        chat = await app.bot.get_chat(ADMIN_GROUP_ID)
+        log.info("Админ-группа найдена: %s", chat.title)
+    except TelegramError as e:
+        log.error(
+            "ВНИМАНИЕ: бот не видит админ-группу (%s). "
+            "Проверьте ID группы и что бот добавлен в неё.", e
+        )
+
+
 def main():
     keep_alive()
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
 
-    app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
+    # Логирование всех входящих (отдельная группа, другие обработчики не блокирует)
+    app.add_handler(TypeHandler(Update, log_update), group=-1)
+
+    app.add_handler(
+        CommandHandler("start", start, filters=filters.ChatType.PRIVATE)
+    )
 
     # Ответы админов в группе -> клиенту
     app.add_handler(
         MessageHandler(
-            filters.Chat(ADMIN_GROUP_ID) & filters.REPLY & ~filters.COMMAND,
+            filters.UpdateType.MESSAGE
+            & filters.Chat(ADMIN_GROUP_ID)
+            & filters.REPLY
+            & ~filters.COMMAND,
             admin_reply,
         )
     )
@@ -215,7 +263,10 @@ def main():
     # Сообщения клиентов -> только в личке
     app.add_handler(
         MessageHandler(
-            filters.ChatType.PRIVATE & ~filters.COMMAND & ~filters.StatusUpdate.ALL,
+            filters.UpdateType.MESSAGE
+            & filters.ChatType.PRIVATE
+            & ~filters.COMMAND
+            & ~filters.StatusUpdate.ALL,
             client_message,
         )
     )
@@ -223,7 +274,7 @@ def main():
     app.add_error_handler(on_error)
 
     log.info("🚀 BOT ISHGA TUSHDI VA XABAR KUTMOQDA!")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
