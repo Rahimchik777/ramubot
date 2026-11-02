@@ -22,14 +22,11 @@ from telegram.ext import (
 # НАСТРОЙКИ
 # BOT_TOKEN обязательно задайте в Render -> Environment (не в коде!)
 # ---------------------------------------------------------------
-BOT_TOKEN = os.environ.get("9244886158:AAEof79CZ7_LKOTX-ExtqGDrgXc365HHifs")
-if not BOT_TOKEN:
-    raise RuntimeError("Переменная окружения BOT_TOKEN не задана!")
+BOT_TOKEN = "9244886158:AAHpFQPprvuPtUYGcPOyiXlwX8jkOjyWcT4"  # <-- единственная строка, которую нужно изменить
 
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004328946925"))
 SITE_URL = os.environ.get("SITE_URL", "https://ramubot.onrender.com")
 
-BTN_CONTACT = "💬 Admin bilan bog'lanish"
 BTN_SITE = "🌐 RAMU Store saytiga o'tish"
 
 logging.basicConfig(
